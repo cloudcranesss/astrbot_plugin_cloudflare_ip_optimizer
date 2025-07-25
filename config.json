@@ -1,0 +1,11 @@
+{
+    "cf_token": "Ss0JnHWDFL9yodgAilq2Y1HIuV5o0W6nVM6SjQBJ",
+    "zone_id": "6e87269cc61704877c7342d834a18c8c",
+    "main_domain": "smartapi.dpdns.org",
+    "sub_domain": "cdn.cf",
+    "record_type": "A",
+    "interval": 300,
+    "retry_count": 3,
+    "result_file": "csft/result.csv",
+    "retry_interval": 5
+}

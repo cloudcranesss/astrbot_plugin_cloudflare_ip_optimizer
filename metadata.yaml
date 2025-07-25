@@ -1,0 +1,5 @@
+name: astrbot_plugin_cloudflare_ip_optimizer
+description: "Cloudflare IP优选器插件，支持IP测速优选和DDNS自动更新功能"
+version: 1.0.0
+author: cloudcranesss
+repo: https://github.com/cloudcranesss/astrbot_plugin_cloudflare_ip_optimizer

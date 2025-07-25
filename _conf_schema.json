@@ -1,0 +1,32 @@
+{
+  "cf_token": {
+    "description": "Cloudflare API Token，用于访问Cloudflare API",
+    "type": "string",
+    "hint": "必填项。在Cloudflare控制台创建API Token，需要Zone:Edit权限",
+    "default": ""
+  },
+  "zone_id": {
+    "description": "Cloudflare Zone ID，对应域名的区域ID",
+    "type": "string", 
+    "hint": "必填项。在Cloudflare域名概览页面右侧可以查看",
+    "default": ""
+  },
+  "main_domain": {
+    "description": "主域名",
+    "type": "string",
+    "hint": "必填项。例如: example.com",
+    "default": ""
+  },
+  "sub_domain": {
+    "description": "子域名前缀",
+    "type": "string",
+    "hint": "选填项。例如: cdn，最终域名为cdn.example.com",
+    "default": ""
+  },
+  "record_type": {
+    "description": "DNS记录类型",
+    "type": "string",
+    "hint": "选填项，默认为A。支持A或AAAA",
+    "default": "A"
+  }
+}
