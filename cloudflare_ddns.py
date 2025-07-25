@@ -1,14 +1,8 @@
 import os
 import asyncio
-import time
-import json
-import logging
 import aiohttp
-from typing import Dict, List, Optional, Tuple
-
-# 配置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger('CloudflareDDNS')
+from astrbot.api import logger
+from typing import Dict, Optional
 
 # 默认配置
 DEFAULT_CONFIG = {
