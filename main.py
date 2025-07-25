@@ -112,32 +112,6 @@ class CloudflareIPOptimizerPlugin(Star):
             logger.info("✅ 所有必要配置已设置")
             yield event.plain_result("🔄 开始更新Cloudflare DDNS记录...")
             
-            # 检查工具状态
-            tool_exists = os.path.exists(self.optimizer.cloudflarespeedtest_path)
-            logger.info(f"工具存在状态: {tool_exists}")
-            
-            if not tool_exists:
-                yield event.plain_result("📥 正在下载CloudflareSpeedTest工具...")
-                logger.info("开始下载CloudflareSpeedTest工具...")
-                download_success = await self.optimizer.download_cloudflarespeedtest()
-                if not download_success:
-                    logger.error("❌ 工具下载失败")
-                    yield event.plain_result("❌ 下载CloudflareSpeedTest工具失败")
-                    return
-                logger.info("✅ 工具下载成功")
-            else:
-                logger.info("✅ 工具已存在，跳过下载")
-            
-            # 首先执行IP优选
-            logger.info("开始执行IP优选测试...")
-            yield event.plain_result("🚀 正在执行IP优选测试...")
-            success = await self.optimizer.run_test()
-            
-            if not success:
-                logger.error("❌ IP优选测试失败，无法更新DDNS")
-                yield event.plain_result("❌ IP优选失败，无法更新DDNS")
-                return
-            
             logger.info("✅ IP优选测试完成，准备更新DDNS")
             
             # 配置DDNS更新器
