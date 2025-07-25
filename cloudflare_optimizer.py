@@ -243,7 +243,12 @@ class CloudflareIPOptimizer:
         logger.info("=== 开始执行Cloudflare IP优选测试 ===")
         
         if args is None:
-            args = []
+            args = [
+                '-o', 'result.csv',
+                '-n', '500',
+                '-sl', '1',
+                '-tl', '200'
+            ]
             
         logger.info(f"测试参数: {args}")
         
@@ -265,6 +270,12 @@ class CloudflareIPOptimizer:
                 # 与ddns.py配置保持一致
                 result_file = os.path.join(self._get_cfst_dir(), 'result.csv')
                 args.extend(['-o', result_file])
+            else:
+                # 如果已存在-o参数，确保使用完整路径
+                o_index = args.index('-o')
+                if o_index + 1 < len(args):
+                    result_file = os.path.join(self._get_cfst_dir(), args[o_index + 1])
+                    args[o_index + 1] = result_file
             
             # 构建命令时确保使用完整的绝对路径
             cmd = [self.cloudflarespeedtest_path] + args
