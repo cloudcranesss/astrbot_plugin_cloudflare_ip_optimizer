@@ -143,22 +143,22 @@ class CloudflareIPOptimizer:
                 for file in files:
                     # Windows系统下直接查找带.exe的文件
                     if 'windows' in system:
-                        if file.lower() == 'cloudflarespeedtest.exe':
+                        if file.lower() == 'cfst.exe' or file.lower() == 'cloudflarespeedtest.exe':
                             self.cloudflarespeedtest_path = os.path.join(root, file)
                             break
                     else:
-                        if file == 'CloudflareSpeedTest':
+                        if file.lower() == 'cfst' or file.lower() == 'cloudflarespeedtest':
                             self.cloudflarespeedtest_path = os.path.join(root, file)
                             os.chmod(self.cloudflarespeedtest_path, 0o755)
                             break
-                    if self.cloudflarespeedtest_path != 'CloudflareSpeedTest':
+                    if self.cloudflarespeedtest_path != os.path.join(cfst_dir, 'CloudflareSpeedTest') and self.cloudflarespeedtest_path != os.path.join(cfst_dir, 'CloudflareSpeedTest.exe'):
                         break
             return True
         except Exception as e:
             logger.error(f"下载失败: {e}")
             return False
             
-    def run_test(self, args: List[str] = None) -> bool:
+    async def run_test(self, args: List[str] = None) -> bool:
         """
         运行CloudflareSpeedTest进行IP测试
         :param args: 额外的命令行参数
@@ -171,7 +171,7 @@ class CloudflareIPOptimizer:
             # 检查工具是否存在
             if not os.path.exists(self.cloudflarespeedtest_path):
                 logger.info(f"工具 {self.cloudflarespeedtest_path} 不存在，尝试下载...")
-                if not self.download_cloudflarespeedtest():
+                if not await self.download_cloudflarespeedtest():
                     return False
             
             # 添加输出CSV格式参数

@@ -43,7 +43,7 @@ class CloudflareIPOptimizerPlugin(Star):
                     return
             
             # 执行IP优选测试
-            success = await asyncio.to_thread(self.optimizer.run_test)
+            success = await self.optimizer.run_test()
             
             if success:
                 # 读取结果文件
@@ -90,7 +90,7 @@ class CloudflareIPOptimizerPlugin(Star):
                     return
             
             # 首先执行IP优选
-            success = await asyncio.to_thread(self.optimizer.run_test)
+            success = await self.optimizer.run_test()
             if not success:
                 yield event.plain_result("❌ IP优选失败，无法更新DDNS")
                 return
