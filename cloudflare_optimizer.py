@@ -87,44 +87,85 @@ class CloudflareIPOptimizer:
                     logger.info(f"获取版本信息: {release_info.get('tag_name', '未知')}")
 
             system = platform.system().lower()
+            machine = platform.machine().lower()
             logger.info(f"当前操作系统: {system}")
+            logger.info(f"当前系统架构: {machine}")
+            
+            # 定义架构映射
+            arch_map = {
+                'x86_64': 'amd64',
+                'amd64': 'amd64',
+                'i386': '386',
+                'i686': '386',
+                'x86': '386',
+                'arm64': 'arm64',
+                'aarch64': 'arm64',
+                'armv7l': 'arm',
+                'arm': 'arm'
+            }
+            
+            arch = arch_map.get(machine, 'amd64')  # 默认使用amd64
+            logger.info(f"映射后的架构: {arch}")
 
-            # 根据操作系统选择下载链接和文件后缀
+            # 根据操作系统和架构选择下载链接和文件后缀
             download_url = None
             file_suffix = ''
             
             logger.info(f"可用资产列表: {[asset['name'] for asset in release_info['assets']]}")
             
             if 'windows' in system:
-                # 查找Windows版本
-                logger.info("正在查找Windows版本...")
+                # 查找Windows版本（优先匹配架构）
+                logger.info(f"正在查找Windows {arch}版本...")
                 for asset in release_info['assets']:
-                    logger.debug(f"检查资产: {asset['name']} - 是否匹配: {'windows' in asset['name'].lower() and asset['name'].endswith('.zip')}")
-                    if 'windows' in asset['name'].lower() and asset['name'].endswith('.zip'):
+                    asset_name = asset['name'].lower()
+                    is_windows = 'windows' in asset_name and asset_name.endswith('.zip')
+                    has_arch = arch in asset_name or (arch == 'amd64' and '64' in asset_name and 'arm' not in asset_name)
+                    
+                    logger.debug(f"检查资产: {asset['name']} - Windows匹配: {is_windows}, 架构匹配: {has_arch}")
+                    
+                    if is_windows and has_arch:
                         download_url = asset['browser_download_url']
                         file_suffix = '.zip'
-                        logger.info(f"找到Windows版本: {asset['name']}")
+                        logger.info(f"找到Windows {arch}版本: {asset['name']}")
                         break
+                        
+                # 如果没找到特定架构，使用通用Windows版本
+                if not download_url:
+                    logger.info("未找到特定架构版本，尝试通用Windows版本...")
+                    for asset in release_info['assets']:
+                        asset_name = asset['name'].lower()
+                        if 'windows' in asset_name and asset_name.endswith('.zip') and 'amd64' not in asset_name and '386' not in asset_name and 'arm' not in asset_name:
+                            download_url = asset['browser_download_url']
+                            file_suffix = '.zip'
+                            logger.info(f"找到通用Windows版本: {asset['name']}")
+                            break
+                            
             elif 'linux' in system:
-                # 查找Linux版本
-                logger.info("正在查找Linux版本...")
+                # 查找Linux版本（优先匹配架构）
+                logger.info(f"正在查找Linux {arch}版本...")
                 for asset in release_info['assets']:
-                    logger.debug(f"检查资产: {asset['name']} - 是否匹配: {'linux' in asset['name'].lower() and asset['name'].endswith('.tar.gz')}")
-                    if 'linux' in asset['name'].lower() and asset['name'].endswith('.tar.gz'):
+                    asset_name = asset['name'].lower()
+                    is_linux = 'linux' in asset_name and asset_name.endswith('.tar.gz')
+                    has_arch = arch in asset_name
+                    
+                    logger.debug(f"检查资产: {asset['name']} - Linux匹配: {is_linux}, 架构匹配: {has_arch}")
+                    
+                    if is_linux and has_arch:
                         download_url = asset['browser_download_url']
                         file_suffix = '.tar.gz'
-                        logger.info(f"找到Linux版本: {asset['name']}")
+                        logger.info(f"找到Linux {arch}版本: {asset['name']}")
                         break
-            else:
-                # 默认尝试Linux版本
-                logger.info("未知系统，默认查找Linux版本...")
-                for asset in release_info['assets']:
-                    logger.debug(f"检查资产: {asset['name']} - 是否匹配: {'linux' in asset['name'].lower() and asset['name'].endswith('.tar.gz')}")
-                    if 'linux' in asset['name'].lower() and asset['name'].endswith('.tar.gz'):
-                        download_url = asset['browser_download_url']
-                        file_suffix = '.tar.gz'
-                        logger.info(f"找到Linux版本: {asset['name']}")
-                        break
+                        
+                # 如果没找到特定架构，使用通用Linux版本
+                if not download_url:
+                    logger.info("未找到特定架构版本，尝试通用Linux版本...")
+                    for asset in release_info['assets']:
+                        asset_name = asset['name'].lower()
+                        if 'linux' in asset_name and asset_name.endswith('.tar.gz') and 'amd64' not in asset_name and '386' not in asset_name and 'arm' not in asset_name:
+                            download_url = asset['browser_download_url']
+                            file_suffix = '.tar.gz'
+                            logger.info(f"找到通用Linux版本: {asset['name']}")
+                            break
 
             if not download_url:
                 logger.error(f"❌ 未找到适用于{system}系统的下载链接")
