@@ -66,11 +66,11 @@ class CloudflareIPOptimizerPlugin(Star):
                         logger.info(f"结果文件读取成功，共{len(df)}条记录")
                         
                         # 按延迟排序并显示前5个结果
-                        df_sorted = df.sort_values(by='延迟(ms)').head(5)
+                        df_sorted = df.sort_values(by='平均延迟').head(5)
                         
                         result_msg = "✅ IP优选测试完成！\n\n最优的5个IP:\n"
                         for idx, row in df_sorted.iterrows():
-                            result_msg += f"{row['IP 地址']} - 延迟: {row['延迟(ms)']}ms - 速度: {row['下载速度(MB/s)']}MB/s\n"
+                            result_msg += f"{row['IP 地址']} - 延迟: {row['平均延迟']}ms - 速度: {row['下载速度(MB/s)']}MB/s\n"
                         
                         logger.info("准备返回测试结果给用户")
                         yield event.plain_result(result_msg)

@@ -245,7 +245,7 @@ class CloudflareIPOptimizer:
             logger.info(f"进程PID: {process.pid}")
 
             output = []
-            timeout = 600  # 增加超时时间到10分钟
+            timeout = 300 # 添加超时参数
             start_time = time.time()
             last_output_time = start_time
 
