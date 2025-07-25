@@ -36,6 +36,14 @@ class CloudflareIPOptimizerPlugin(Star):
         try:
             yield event.plain_result("🚀 开始执行Cloudflare IP优选测试，请稍候...")
             
+            # 确保CloudflareSpeedTest已安装
+            if not os.path.exists(self.optimizer.cloudflarespeedtest_path):
+                yield event.plain_result("📥 正在下载CloudflareSpeedTest工具...")
+                download_success = await self.optimizer.download_cloudflarespeedtest()
+                if not download_success:
+                    yield event.plain_result("❌ 下载CloudflareSpeedTest工具失败")
+                    return
+            
             # 执行IP优选测试
             success = await asyncio.to_thread(self.optimizer.run_test)
             
@@ -63,91 +71,7 @@ class CloudflareIPOptimizerPlugin(Star):
                 
         except Exception as e:
             yield event.plain_result(f"❌ 执行失败: {str(e)}")
-        """自动下载并安装CloudflareSpeedTest工具"""
-        try:
-            # GitHub releases API URL
-            api_url = "https://api.github.com/repos/XIU2/CloudflareSpeedTest/releases/latest"
-            response = requests.get(api_url)
-            response.raise_for_status()
-            release_info = response.json()
 
-            system = platform.system().lower()
-            logger.info(f"当前操作系统: {system}")
-
-            # 根据操作系统选择下载链接和文件后缀
-            download_url = None
-            file_suffix = ''
-            if 'windows' in system:
-                # 查找Windows版本
-                for asset in release_info['assets']:
-                    if 'windows' in asset['name'].lower() and asset['name'].endswith('.zip'):
-                        download_url = asset['browser_download_url']
-                        file_suffix = '.zip'
-                        break
-            elif 'linux' in system:
-                # 查找Linux版本
-                for asset in release_info['assets']:
-                    if 'linux' in asset['name'].lower() and asset['name'].endswith('.tar.gz'):
-                        download_url = asset['browser_download_url']
-                        file_suffix = '.tar.gz'
-                        break
-            else:
-                # 默认尝试Linux版本
-                for asset in release_info['assets']:
-                    if 'linux' in asset['name'].lower() and asset['name'].endswith('.tar.gz'):
-                        download_url = asset['browser_download_url']
-                        file_suffix = '.tar.gz'
-                        break
-
-            if not download_url:
-                logger.error(f"未找到适用于{system}系统的下载链接")
-                return False
-
-            # 创建cfst目录
-            cfst_dir = self._get_cfst_dir()
-            os.makedirs(cfst_dir, exist_ok=True)
-            
-            # 下载并解压
-            with tempfile.NamedTemporaryFile(suffix=file_suffix, delete=False) as tmp_file:
-                tmp_file.write(requests.get(download_url).content)
-            
-            cfst_dir = self._get_cfst_dir()
-            
-            # 根据文件类型选择解压方式
-            if file_suffix == '.zip':
-                # 使用zipfile解压
-                with zipfile.ZipFile(tmp_file.name, 'r') as zip_ref:
-                    zip_ref.extractall(cfst_dir)
-            elif file_suffix == '.tar.gz':
-                # 使用tarfile解压
-                import tarfile
-                with tarfile.open(tmp_file.name, 'r:gz') as tar_ref:
-                    tar_ref.extractall(cfst_dir)
-            
-            os.unlink(tmp_file.name)
-            logger.info("CloudflareSpeedTest下载并安装成功")
-            
-            # 更新工具路径
-            cfst_dir = self._get_cfst_dir()
-            # 查找解压后的可执行文件
-            for root, dirs, files in os.walk(cfst_dir):
-                for file in files:
-                    # Windows系统下直接查找带.exe的文件
-                    if 'windows' in system:
-                        if file.lower() == 'cloudflarespeedtest.exe':
-                            self.cloudflarespeedtest_path = os.path.join(root, file)
-                            break
-                    else:
-                        if file == 'CloudflareSpeedTest':
-                            self.cloudflarespeedtest_path = os.path.join(root, file)
-                            os.chmod(self.cloudflarespeedtest_path, 0o755)
-                            break
-                    if self.cloudflarespeedtest_path != 'CloudflareSpeedTest':
-                        break
-            return True
-        except Exception as e:
-            logger.error(f"下载失败: {e}")
-            return False
     @filter.command("cf更新")
     async def update_ddns(self, event: AstrMessageEvent) -> AsyncGenerator[Any, None]:
         """更新Cloudflare DDNS记录"""
@@ -158,6 +82,14 @@ class CloudflareIPOptimizerPlugin(Star):
                 return
             
             yield event.plain_result("🔄 开始更新Cloudflare DDNS记录...")
+            
+            # 确保CloudflareSpeedTest已安装
+            if not os.path.exists(self.optimizer.cloudflarespeedtest_path):
+                yield event.plain_result("📥 正在下载CloudflareSpeedTest工具...")
+                download_success = await self.optimizer.download_cloudflarespeedtest()
+                if not download_success:
+                    yield event.plain_result("❌ 下载CloudflareSpeedTest工具失败")
+                    return
             
             # 首先执行IP优选
             success = await asyncio.to_thread(self.optimizer.run_test)
@@ -177,8 +109,8 @@ class CloudflareIPOptimizerPlugin(Star):
             
             ddns_updater = CloudflareDDNSUpdater(config)
             
-            # 执行DDNS更新
-            update_success = await asyncio.to_thread(ddns_updater.update_ddns)
+            # 执行DDNS更新（异步）
+            update_success = await ddns_updater.update_ddns()
             
             if update_success:
                 best_ip = ddns_updater._get_lowest_latency_ip()
@@ -347,41 +279,3 @@ class CloudflareIPOptimizerPlugin(Star):
             
         except Exception as e:
             yield event.plain_result(f"❌ 获取状态失败: {str(e)}")
-    import argparse
-    parser = argparse.ArgumentParser(description='Cloudflare IP优选')
-    parser.add_argument('-n', '--thread', type=int, default=500, help='延迟测速线程；越多延迟测速越快，性能弱的设备 (如路由器) 请勿太高')
-    parser.add_argument('-dn', '--count', type=int, default=10, help='下载测速数量；延迟测速并排序后，从最低延迟起下载测速的数量')
-    parser.add_argument('-o', '--output', default='result.csv', help='写入结果文件；如路径含有空格请加上引号；值为空时不写入文件 [-o ""]；(默认 result.csv)')
-    parser.add_argument('-p', '--params', type=int, default=0, help='显示结果数量；测速后直接显示指定数量的结果，为 0 时不显示结果直接退出；(默认 10 个)')
-    args = parser.parse_args()
-    
-    # 运行IP优选
-    optimizer = CloudflareIPOptimizer()
-    test_params = []
-    if args.thread:
-        test_params.extend(['-n', str(args.thread)])
-    if args.count:
-        test_params.extend(['-dn', str(args.count)])
-    if args.output:
-        test_params.extend(['-o', args.output])
-    if args.params:
-        test_params.extend(['-p', str(args.params)])
-    
-    # 执行测试并处理结果
-    success = optimizer.run_test(test_params)
-    
-    # 显示结果（如果需要）
-    if success and args.params > 0:
-        try:
-            import pandas as pd
-            df = pd.read_csv(os.path.join(optimizer._get_cfst_dir(), args.output))
-            # 按延迟排序并显示前N个结果
-            df_sorted = df.sort_values(by='延迟(ms)')
-            print(f"\n前{args.params}个最优IP: ")
-            print(df_sorted.head(args.params).to_string(index=False))
-        except Exception as e:
-            logger.error(f"显示结果时出错: {str(e)}")
-    
-    # 确保程序退出
-    import sys
-    sys.exit(0 if success else 1)

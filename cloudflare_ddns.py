@@ -1,8 +1,9 @@
 import os
+import asyncio
 import time
 import json
 import logging
-import requests
+import aiohttp
 from typing import Dict, List, Optional, Tuple
 
 # 配置日志
@@ -62,8 +63,8 @@ class CloudflareDDNSUpdater:
         
         return merged_config
 
-    def _get_record_id(self) -> Optional[str]:
-        """获取DNS记录ID"""
+    async def _get_record_id(self) -> Optional[str]:
+        """获取DNS记录ID（异步版本）"""
         url = f"https://api.cloudflare.com/client/v4/zones/{self.zone_id}/dns_records"
         headers = {
             "Authorization": f"Bearer {self.cf_token}",
@@ -71,22 +72,23 @@ class CloudflareDDNSUpdater:
         }
         
         try:
-            response = requests.get(url, headers=headers, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
-            for record in data["result"]:
-                if record["name"] == self.full_domain and record["type"] == self.record_type:
-                    return record["id"]
-            
-            logger.warning(f"未找到记录: {self.full_domain} ({self.record_type})")
-            return None
-        except requests.exceptions.RequestException as e:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    
+                    for record in data["result"]:
+                        if record["name"] == self.full_domain and record["type"] == self.record_type:
+                            return record["id"]
+                    
+                    logger.warning(f"未找到记录: {self.full_domain} ({self.record_type})")
+                    return None
+        except aiohttp.ClientError as e:
             logger.error(f"获取记录ID失败: {str(e)}")
             return None
 
-    def _update_dns_record(self, record_id: str, ip: str) -> bool:
-        """更新DNS记录"""
+    async def _update_dns_record(self, record_id: str, ip: str) -> bool:
+        """更新DNS记录（异步版本）"""
         url = f"https://api.cloudflare.com/client/v4/zones/{self.zone_id}/dns_records/{record_id}"
         headers = {
             "Authorization": f"Bearer {self.cf_token}",
@@ -101,22 +103,23 @@ class CloudflareDDNSUpdater:
         }
         
         try:
-            response = requests.put(url, headers=headers, json=data, timeout=10)
-            response.raise_for_status()
-            result = response.json()
-            
-            if result["success"]:
-                logger.info(f"成功更新DNS记录: {self.full_domain} -> {ip}")
-                return True
-            else:
-                logger.error(f"更新DNS记录失败: {result['errors']}")
-                return False
-        except requests.exceptions.RequestException as e:
+            async with aiohttp.ClientSession() as session:
+                async with session.put(url, headers=headers, json=data, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                    response.raise_for_status()
+                    result = await response.json()
+                    
+                    if result["success"]:
+                        logger.info(f"成功更新DNS记录: {self.full_domain} -> {ip}")
+                        return True
+                    else:
+                        logger.error(f"更新DNS记录失败: {result['errors']}")
+                        return False
+        except aiohttp.ClientError as e:
             logger.error(f"更新DNS记录请求失败: {str(e)}")
             return False
 
-    def _create_dns_record(self, ip: str) -> bool:
-        """创建DNS记录"""
+    async def _create_dns_record(self, ip: str) -> bool:
+        """创建DNS记录（异步版本）"""
         url = f"https://api.cloudflare.com/client/v4/zones/{self.zone_id}/dns_records"
         headers = {
             "Authorization": f"Bearer {self.cf_token}",
@@ -131,17 +134,18 @@ class CloudflareDDNSUpdater:
         }
         
         try:
-            response = requests.post(url, headers=headers, json=data, timeout=10)
-            response.raise_for_status()
-            result = response.json()
-            
-            if result["success"]:
-                logger.info(f"成功创建DNS记录: {self.full_domain} -> {ip}")
-                return True
-            else:
-                logger.error(f"创建DNS记录失败: {result['errors']}")
-                return False
-        except requests.exceptions.RequestException as e:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, headers=headers, json=data, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                    response.raise_for_status()
+                    result = await response.json()
+                    
+                    if result["success"]:
+                        logger.info(f"成功创建DNS记录: {self.full_domain} -> {ip}")
+                        return True
+                    else:
+                        logger.error(f"创建DNS记录失败: {result['errors']}")
+                        return False
+        except aiohttp.ClientError as e:
             logger.error(f"创建DNS记录请求失败: {str(e)}")
             return False
 
@@ -198,31 +202,31 @@ class CloudflareDDNSUpdater:
             logger.error(f"读取结果文件失败: {str(e)}")
             return None
 
-    def update_ddns(self) -> bool:
-        """更新DDNS记录"""
+    async def update_ddns(self) -> bool:
+        """更新DDNS记录（异步版本）"""
         # 获取延迟最低的IP
         new_ip = self._get_lowest_latency_ip()
         if not new_ip:
             return False
         
         # 获取记录ID
-        record_id = self._get_record_id()
+        record_id = await self._get_record_id()
         
         # 重试机制
         for attempt in range(self.retry_count):
             if record_id:
                 # 更新现有记录
-                if self._update_dns_record(record_id, new_ip):
+                if await self._update_dns_record(record_id, new_ip):
                     return True
             else:
                 # 创建新记录
-                if self._create_dns_record(new_ip):
+                if await self._create_dns_record(new_ip):
                     return True
             
             # 重试前等待
             if attempt < self.retry_count - 1:
                 logger.info(f"更新失败，{self.retry_interval}秒后重试...")
-                time.sleep(self.retry_interval)
+                await asyncio.sleep(self.retry_interval)
         
         logger.error(f"达到最大重试次数({self.retry_count})，更新失败")
         return False

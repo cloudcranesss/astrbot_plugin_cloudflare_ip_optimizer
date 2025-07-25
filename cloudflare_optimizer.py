@@ -2,7 +2,7 @@ import os
 import time
 import logging
 import tempfile
-import requests
+import aiohttp
 import zipfile
 import subprocess
 import platform
@@ -63,14 +63,16 @@ class CloudflareIPOptimizer:
         os.makedirs(target_dir, exist_ok=True)
         return target_dir
         
-    def download_cloudflarespeedtest(self) -> bool:
-        """自动下载并安装CloudflareSpeedTest工具"""
+    async def download_cloudflarespeedtest(self) -> bool:
+        """自动下载并安装CloudflareSpeedTest工具（异步版本）"""
         try:
             # GitHub releases API URL
             api_url = "https://api.github.com/repos/XIU2/CloudflareSpeedTest/releases/latest"
-            response = requests.get(api_url)
-            response.raise_for_status()
-            release_info = response.json()
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url) as response:
+                    response.raise_for_status()
+                    release_info = await response.json()
 
             system = platform.system().lower()
             logger.info(f"当前操作系统: {system}")
@@ -108,9 +110,15 @@ class CloudflareIPOptimizer:
             cfst_dir = self._get_cfst_dir()
             os.makedirs(cfst_dir, exist_ok=True)
             
-            # 下载并解压
+            # 异步下载文件
+            async with aiohttp.ClientSession() as session:
+                async with session.get(download_url) as response:
+                    response.raise_for_status()
+                    content = await response.read()
+            
+            # 保存到临时文件
             with tempfile.NamedTemporaryFile(suffix=file_suffix, delete=False) as tmp_file:
-                tmp_file.write(requests.get(download_url).content)
+                tmp_file.write(content)
             
             cfst_dir = self._get_cfst_dir()
             
