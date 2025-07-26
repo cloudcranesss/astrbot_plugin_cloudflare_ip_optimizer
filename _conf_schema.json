@@ -31,13 +31,13 @@
   },
   "enable_auto_update": {
     "description": "启用自动定时更新",
-    "type": "boolean",
+    "type": "bool",
     "hint": "是否启用自动定时执行IP优选测试和DDNS更新",
     "default": false
   },
   "auto_update_interval": {
     "description": "自动更新间隔时间（秒）",
-    "type": "integer",
+    "type": "int",
     "hint": "自动执行IP优选测试和DDNS更新的时间间隔，建议至少3600秒（1小时）",
     "default": 3600
   }
