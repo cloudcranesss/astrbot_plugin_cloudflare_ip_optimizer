@@ -1,4 +1,5 @@
 import os
+import asyncio
 from typing import Any, AsyncGenerator
 from astrbot.api import logger, AstrBotConfig
 from astrbot.api.event import AstrMessageEvent, filter
@@ -20,12 +21,35 @@ class CloudflareIPOptimizerPlugin(Star):
         self.sub_domain = config.get("sub_domain", "")
         self.record_type = config.get("record_type", "A")
         
+        # 定时器配置
+        self.enable_auto_update = config.get("enable_auto_update", False)
+        self.auto_update_interval = config.get("auto_update_interval", 3600)  # 默认1小时
+        self.auto_task = None
+        
         # 初始化优化器
         self.optimizer = CloudflareIPOptimizer()
         
         logger.info("Cloudflare IP优化器插件已初始化")
         
-    @filter.command("cf优化")
+        # 如果启用了自动更新，启动定时任务
+        if self.enable_auto_update:
+            asyncio.create_task(self.start_auto_update())
+        
+    @filter.command_group("cf")
+    async def cf_group(self, event: AstrMessageEvent) -> AsyncGenerator[Any, None]:
+        """Cloudflare IP优化器命令组"""
+        if not event.message_str.strip():
+            yield event.plain_result(
+                "🌐 Cloudflare IP优化器 命令帮助:\n"
+                "  cf 优化 - 执行IP优选测试\n"
+                "  cf 更新 - 更新DDNS记录\n"
+                "  cf 状态 - 检查插件状态\n"
+                "  cf 自动更新 - 切换自动更新状态\n"
+                "  cf 定时状态 - 查看自动更新状态"
+            )
+            return
+    
+    @filter.command("cf 优化")
     async def optimize_ip(self, event: AstrMessageEvent) -> AsyncGenerator[Any, None]:
         """执行Cloudflare IP优选测试"""
         logger.info("📞 收到cf优化命令请求")
@@ -90,7 +114,7 @@ class CloudflareIPOptimizerPlugin(Star):
             logger.error(f"异常堆栈:\n{traceback.format_exc()}")
             yield event.plain_result(f"❌ 执行失败: {str(e)}")
 
-    @filter.command("cf更新")
+    @filter.command("cf 更新")
     async def update_ddns(self, event: AstrMessageEvent) -> AsyncGenerator[Any, None]:
         """更新Cloudflare DDNS记录"""
         logger.info("📞 收到cf更新命令请求")
@@ -152,7 +176,7 @@ class CloudflareIPOptimizerPlugin(Star):
             logger.error(f"异常堆栈:\n{traceback.format_exc()}")
             yield event.plain_result(f"❌ 更新失败: {str(e)}")
 
-    @filter.command("cf状态")
+    @filter.command("cf 状态")
     async def check_status(self, event: AstrMessageEvent) -> AsyncGenerator[Any, None]:
         """检查Cloudflare优化器状态"""
         logger.info("📞 收到cf状态命令请求")
@@ -207,3 +231,111 @@ class CloudflareIPOptimizerPlugin(Star):
             import traceback
             logger.error(f"异常堆栈:\n{traceback.format_exc()}")
             yield event.plain_result(f"❌ 获取状态失败: {str(e)}")
+
+    async def start_auto_update(self):
+        """启动自动更新定时任务"""
+        if self.auto_task is not None:
+            logger.warning("自动更新任务已在运行")
+            return
+            
+        logger.info(f"启动自动更新定时任务，间隔: {self.auto_update_interval}秒")
+        self.auto_task = asyncio.create_task(self._auto_update_loop())
+
+    async def stop_auto_update(self):
+        """停止自动更新定时任务"""
+        if self.auto_task is not None:
+            logger.info("停止自动更新定时任务")
+            self.auto_task.cancel()
+            try:
+                await self.auto_task
+            except asyncio.CancelledError:
+                pass
+            self.auto_task = None
+
+    async def _auto_update_loop(self):
+        """自动更新循环任务"""
+        logger.info("自动更新循环任务已启动")
+        
+        while True:
+            try:
+                # 等待指定间隔时间
+                await asyncio.sleep(self.auto_update_interval)
+                
+                # 检查必要配置
+                if not all([self.cf_token, self.zone_id, self.main_domain]):
+                    logger.warning("自动更新缺少必要配置，跳过本次执行")
+                    continue
+                
+                logger.info("🔄 开始执行定时IP优选和DDNS更新")
+                
+                # 执行IP优选测试
+                test_success = await self.optimizer.run_test()
+                if not test_success:
+                    logger.error("定时IP优选测试失败，跳过DDNS更新")
+                    continue
+                
+                # 执行DDNS更新
+                config = {
+                    "cf_token": self.cf_token,
+                    "zone_id": self.zone_id,
+                    "main_domain": self.main_domain,
+                    "sub_domain": self.sub_domain,
+                    "record_type": self.record_type,
+                    "result_file": "csft/result.csv"
+                }
+                
+                ddns_updater = CloudflareDDNSUpdater(config)
+                update_success = await ddns_updater.update_ddns()
+                
+                if update_success:
+                    best_ip = ddns_updater._get_lowest_latency_ip()
+                    domain = f"{self.sub_domain}.{self.main_domain}" if self.sub_domain else self.main_domain
+                    logger.info(f"✅ 定时DDNS更新成功！{domain} -> {best_ip}")
+                else:
+                    logger.error("❌ 定时DDNS更新失败")
+                    
+            except asyncio.CancelledError:
+                logger.info("自动更新任务被取消")
+                break
+            except Exception as e:
+                logger.error(f"自动更新任务执行异常: {e}")
+                import traceback
+                logger.error(f"异常堆栈:\n{traceback.format_exc()}")
+                # 发生异常时等待一段时间后重试，避免频繁重试
+                await asyncio.sleep(300)  # 等待5分钟
+
+    @filter.command("cf 自动更新")
+    async def toggle_auto_update(self, event: AstrMessageEvent) -> AsyncGenerator[Any, None]:
+        """切换自动更新状态"""
+        try:
+            if self.enable_auto_update:
+                # 如果已启用，则禁用
+                self.enable_auto_update = False
+                await self.stop_auto_update()
+                logger.info("自动更新已禁用")
+                yield event.plain_result("✅ 自动更新已禁用")
+            else:
+                # 如果未启用，则启用
+                self.enable_auto_update = True
+                await self.start_auto_update()
+                logger.info("自动更新已启用")
+                yield event.plain_result(f"✅ 自动更新已启用，间隔: {self.auto_update_interval}秒")
+                
+        except Exception as e:
+            logger.error(f"切换自动更新状态失败: {e}")
+            yield event.plain_result(f"❌ 操作失败: {str(e)}")
+
+    @filter.command("cf 定时状态")
+    async def check_auto_update_status(self, event: AstrMessageEvent) -> AsyncGenerator[Any, None]:
+        """检查自动更新状态"""
+        try:
+            status_msg = "📊 自动更新状态:\n\n"
+            status_msg += f"自动更新: {'✅ 已启用' if self.enable_auto_update else '❌ 已禁用'}\n"
+            status_msg += f"更新间隔: {self.auto_update_interval}秒 ({self.auto_update_interval//3600}小时{self.auto_update_interval%3600//60}分钟)\n"
+            status_msg += f"定时任务: {'✅ 运行中' if self.auto_task and not self.auto_task.cancelled() else '❌ 未运行'}\n"
+            
+            yield event.plain_result(status_msg)
+            
+        except Exception as e:
+            logger.error(f"检查自动更新状态失败: {e}")
+            yield event.plain_result(f"❌ 检查状态失败: {str(e)}")
