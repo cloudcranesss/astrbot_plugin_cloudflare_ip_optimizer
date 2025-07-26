@@ -49,7 +49,7 @@ class CloudflareIPOptimizerPlugin(Star):
             )
             return
     
-    @filter.command("cf 优化")
+    @cf_group.command("优化")
     async def optimize_ip(self, event: AstrMessageEvent) -> AsyncGenerator[Any, None]:
         """执行Cloudflare IP优选测试"""
         logger.info("📞 收到cf优化命令请求")
@@ -114,7 +114,7 @@ class CloudflareIPOptimizerPlugin(Star):
             logger.error(f"异常堆栈:\n{traceback.format_exc()}")
             yield event.plain_result(f"❌ 执行失败: {str(e)}")
 
-    @filter.command("cf 更新")
+    @cf_group.command("更新")
     async def update_ddns(self, event: AstrMessageEvent) -> AsyncGenerator[Any, None]:
         """更新Cloudflare DDNS记录"""
         logger.info("📞 收到cf更新命令请求")
@@ -176,7 +176,7 @@ class CloudflareIPOptimizerPlugin(Star):
             logger.error(f"异常堆栈:\n{traceback.format_exc()}")
             yield event.plain_result(f"❌ 更新失败: {str(e)}")
 
-    @filter.command("cf 状态")
+    @cf_group.command("状态")
     async def check_status(self, event: AstrMessageEvent) -> AsyncGenerator[Any, None]:
         """检查Cloudflare优化器状态"""
         logger.info("📞 收到cf状态命令请求")
@@ -304,7 +304,7 @@ class CloudflareIPOptimizerPlugin(Star):
                 # 发生异常时等待一段时间后重试，避免频繁重试
                 await asyncio.sleep(300)  # 等待5分钟
 
-    @filter.command("cf 自动更新")
+    @cf_group.command("自动更新")
     async def toggle_auto_update(self, event: AstrMessageEvent) -> AsyncGenerator[Any, None]:
         """切换自动更新状态"""
         try:
@@ -325,7 +325,7 @@ class CloudflareIPOptimizerPlugin(Star):
             logger.error(f"切换自动更新状态失败: {e}")
             yield event.plain_result(f"❌ 操作失败: {str(e)}")
 
-    @filter.command("cf 定时状态")
+    @cf_group.command("定时状态")
     async def check_auto_update_status(self, event: AstrMessageEvent) -> AsyncGenerator[Any, None]:
         """检查自动更新状态"""
         try:
