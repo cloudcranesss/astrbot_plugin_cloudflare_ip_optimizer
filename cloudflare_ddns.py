@@ -67,7 +67,7 @@ class CloudflareDDNSUpdater:
         
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10), verify=False) as response:
+                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as response:
                     response.raise_for_status()
                     data = await response.json()
                     
@@ -98,7 +98,7 @@ class CloudflareDDNSUpdater:
         
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.put(url, headers=headers, json=data, timeout=aiohttp.ClientTimeout(total=10), verify=False) as response:
+                async with session.put(url, headers=headers, json=data, timeout=aiohttp.ClientTimeout(total=10)) as response:
                     response.raise_for_status()
                     result = await response.json()
                     
@@ -129,7 +129,7 @@ class CloudflareDDNSUpdater:
         
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(url, headers=headers, json=data, timeout=aiohttp.ClientTimeout(total=10), verify=False) as response:
+                async with session.post(url, headers=headers, json=data, timeout=aiohttp.ClientTimeout(total=10)) as response:
                     response.raise_for_status()
                     result = await response.json()
                     
